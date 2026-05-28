@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>JSW Emission Dashboard (OEM)</title>
+
+https://cdn.jsdelivr.net/npm/chart.jsscript>
+
+<style>
+body {
+    margin:0;
+    font-family: Arial;
+    background:#eef2f5;
+}
+
+.header {
+    background:#000;
+    color:white;
+    padding:20px;
+    text-align:center;
+}
+
+.container {
+    display:flex;
+    justify-content:center;
+    flex-wrap:wrap;
+}
+
+.card {
+    background:white;
+    margin:15px;
+    padding:20px;
+    border-radius:10px;
+    width:420px;
+    box-shadow:0 0 10px rgba(0,0,0,0.1);
+}
+
+.vehicle-box {
+    text-align:center;
+    font-weight:bold;
+    margin-top:10px;
+}
+
+input, select {
+    width:95%;
+    padding:6px;
+    margin:5px 0;
+}
+
+button {
+    width:100%;
+    padding:10px;
+    background:#0078d7;
+    color:white;
+    border:none;
+}
+
+table {
+    width:100%;
+    border-collapse:collapse;
+    margin-top:10px;
+}
+
+th, td {
+    border:1px solid #ddd;
+    padding:6px;
+    text-align:center;
+}
+
+th {
+    background:#0078d7;
+    color:white;
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">
+<h1>🚛 JSW Emission Dashboard (Diesel vs EV)</h1>
+</div>
+
+<div class="container">
+
+<!-- INPUT -->
+<div class="card">
+<h3>Inputs</h3>
+
+<label>Fleet Size</label>
+<input id="fleet" value="100">
+
+<label>Distance (km)</label>
+<input id="distance" value="100000">
+
+<label>Diesel Mileage (km/l)</label>
+<input id="mileage" value="4.5">
+
+<label>Fuel Energy (kWh/l)</label>
+<input id="energy" value="10">
+
+<label>Scaling Factor</label>
+<input id="scaling" value="2.5">
+
+<label>EV Consumption (kWh/km)</label>
+<input id="ev_kwh" value="1.2">
+
+<label>Grid CO₂ (kg/kWh)</label>
+<input id="grid" value="0.82">
+
+<button onclick="calculate()">Calculate</button>
+</div>
+
+<!-- DIESEL -->
+<div class="card">
+<h3>⛽ Diesel Vehicle</h3>
+
+<div class="vehicle-box">TRUCK</div>
+
+<table id="dieselTable">
+<tr>
+<th>Pollutant</th>
+<th>kg</th>
+</tr>
+</table>
+
+<div id="dieselSummary"></div>
+
+</div>
+
+<!-- EV -->
+<div class="card">
+<h3>🔋 Electric Vehicle</h3>
+
+<div class="vehicle-box">EV TRUCK</div>
+
+<table id="evTable">
+<tr>
+<th>Parameter</th>
+<th>Value</th>
+</tr>
+</table>
+
+<div id="evSummary"></div>
+
+</div>
+
+<!-- GRAPH -->
+<div class="card" style="width:850px">
+<h3>Comparison Chart</h3>
+<canvas id="chart"></canvas>
+</div>
+
+</div>
+
+<script>
+
+let chart;
+
+function calculate(){
+
+let fleet=+fleet.value;
+let dist=+distance.value;
+let mileage=+mileage.value;
+let energy=+energy.value;
+let scaling=+scaling.value;
+let ev_kwh=+ev_kwh.value;
+let grid=+grid.value;
+
+// Diesel
+let fuel=dist/mileage;
+let CO2_diesel=fuel*2.64;
+
+let limits={NOx:0.46,PM:0.01,CO:4,HC:0.16};
+
+let dieselTableHTML=`<tr><th>Pollutant</th><th>kg</th></tr>`;
+
+let dieselVals=[];
+let labels=[];
+
+for(let p in limits){
+let gkm=limits[p]*(energy/mileage)*scaling;
+let total=gkm*dist*fleet/1000;
+dieselVals.push(total);
+labels.push(p);
+
+dieselTableHTML+=`<tr>
+<td>${p}</td>
+<td>${total.toFixed(1)}</td>
+</tr>`;
+}
+
+dieselTable.innerHTML=dieselTableHTML;
+
+dieselSummary.innerHTML=`
+<b>Fuel:</b> ${fuel.toFixed(0)} L<br>
+<b>CO₂:</b> ${CO2_diesel.toFixed(0)} kg
+`;
+
+// EV
+let energy_total=dist*ev_kwh;
+let CO2_ev=energy_total*grid;
+
+evTable.innerHTML=`
+<tr><th>Parameter</th><th>Value</th></tr>
+<tr><td>Energy</td><td>${energy_total.toFixed(0)} kWh</td></tr>
+<tr><td>CO₂</td><td>${CO2_ev.toFixed(0)} kg</td></tr>
+`;
+
+evSummary.innerHTML=`
+<b>Grid Emission:</b> ${grid} kg/kWh
+`;
+
+// GRAPH
+if(chart) chart.destroy();
+
+chart=new Chart(chart, {
+type:'bar',
+data:{
+labels:['CO₂'],
+datasets:[
+{
+label:'Diesel CO₂',
+data:[CO2_diesel],
+backgroundColor:'red'
+},
+{
+label:'EV CO₂',
+data:[CO2_ev],
+backgroundColor:'green'
+}
+]
+},
+options:{
+responsive:true,
+plugins:{legend:{display:true}},
+scales:{y:{beginAtZero:true}}
+}
+});
+
+}
+</script>
+
+</body>
+</html>
