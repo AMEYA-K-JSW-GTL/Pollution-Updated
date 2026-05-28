@@ -2,45 +2,58 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>JSW Emission Dashboard (OEM)</title>
-
+<title>JSW OEM Emission Dashboard</title>
 https://cdn.jsdelivr.net/npm/chart.jsscript>
 
 <style>
+
 body {
     margin:0;
     font-family: Arial;
-    background:#eef2f5;
+    background:#f2f5f7;
 }
 
+/* HEADER */
 .header {
-    background:#000;
+    background:black;
     color:white;
     padding:20px;
     text-align:center;
 }
 
+/* LAYOUT */
 .container {
     display:flex;
-    justify-content:center;
     flex-wrap:wrap;
+    justify-content:center;
 }
 
+/* CARDS */
 .card {
     background:white;
-    margin:15px;
-    padding:20px;
-    border-radius:10px;
     width:420px;
-    box-shadow:0 0 10px rgba(0,0,0,0.1);
+    margin:15px;
+    padding:15px;
+    border-radius:10px;
+    box-shadow:0 2px 10px rgba(0,0,0,0.1);
 }
 
-.vehicle-box {
+/* VEHICLE PANELS */
+.vehicle {
     text-align:center;
-    font-weight:bold;
-    margin-top:10px;
 }
 
+.vehicle img {
+    width:100%;
+    height:130px;
+    object-fit:contain;
+}
+
+.vehicle h3 {
+    margin:5px 0;
+}
+
+/* INPUT */
 input, select {
     width:95%;
     padding:6px;
@@ -55,6 +68,7 @@ button {
     border:none;
 }
 
+/* TABLE */
 table {
     width:100%;
     border-collapse:collapse;
@@ -71,20 +85,29 @@ th {
     background:#0078d7;
     color:white;
 }
+
 </style>
 </head>
 
 <body>
 
 <div class="header">
-<h1>🚛 JSW Emission Dashboard (Diesel vs EV)</h1>
+<h1>🚛 JSW Emission Dashboard (OEM-Level)</h1>
 </div>
 
 <div class="container">
 
-<!-- INPUT -->
+<!-- INPUT PANEL -->
 <div class="card">
-<h3>Inputs</h3>
+
+<h3>Input Parameters</h3>
+
+<label>Vehicle Type</label>
+<select id="vehicle">
+<option value="truck">Truck</option>
+<option value="bus">Bus</option>
+<option value="tractor">4x2 Tractor Trailer</option>
+</select>
 
 <label>Fleet Size</label>
 <input id="fleet" value="100">
@@ -108,46 +131,48 @@ th {
 <input id="grid" value="0.82">
 
 <button onclick="calculate()">Calculate</button>
+
 </div>
 
-<!-- DIESEL -->
-<div class="card">
-<h3>⛽ Diesel Vehicle</h3>
+<!-- DIESEL PANEL -->
+<div class="card vehicle">
 
-<div class="vehicle-box">TRUCK</div>
+<img src="https://cdn.pixabay.com/photo/2013/07/13/10/07/truck-156371_960_3>Diesel Vehicle</h3>
 
-<table id="dieselTable">
-<tr>
-<th>Pollutant</th>
-<th>kg</th>
-</tr>
-</table>
+<table id="dieselTable"></table>
 
 <div id="dieselSummary"></div>
 
 </div>
 
-<!-- EV -->
-<div class="card">
-<h3>🔋 Electric Vehicle</h3>
+<!-- EV PANEL -->
+<div class="card vehicle">
 
-<div class="vehicle-box">EV TRUCK</div>
+https://cdn.pixabay.com/photo/2017/01/06/19/15/bus-1952264_960_720.png
+<h3>Electric Vehicle</h3>
 
-<table id="evTable">
-<tr>
-<th>Parameter</th>
-<th>Value</th>
-</tr>
-</table>
+<table id="evTable"></table>
 
 <div id="evSummary"></div>
 
 </div>
 
-<!-- GRAPH -->
-<div class="card" style="width:850px">
-<h3>Comparison Chart</h3>
+<!-- TRACTOR PANEL -->
+<div class="card vehicle">
+
+https://cdn.pixabay.com/photo/2014/04/03/10/32/truck-311925_960_720.png">
+<h3>Tractor Trailer</h3>
+
+<div id="tractorInfo">Used for high load scenarios</div>
+
+</div>
+
+<!-- GRAPH PANEL -->
+<div class="card" style="width:900px">
+
+<h3>Emission Comparison</h3>
 <canvas id="chart"></canvas>
+
 </div>
 
 </div>
@@ -166,78 +191,76 @@ let scaling=+scaling.value;
 let ev_kwh=+ev_kwh.value;
 let grid=+grid.value;
 
-// Diesel
-let fuel=dist/mileage;
-let CO2_diesel=fuel*2.64;
-
 let limits={NOx:0.46,PM:0.01,CO:4,HC:0.16};
 
-let dieselTableHTML=`<tr><th>Pollutant</th><th>kg</th></tr>`;
+// DIESEL
+let fuel=dist/mileage;
+let CO2_d=fuel*2.64;
 
-let dieselVals=[];
+let dieselHTML="<tr><th>Pollutant</th><th>Total (kg)</th></tr>";
+
 let labels=[];
+let dieselVals=[];
+let evVals=[];
 
 for(let p in limits){
+
 let gkm=limits[p]*(energy/mileage)*scaling;
 let total=gkm*dist*fleet/1000;
-dieselVals.push(total);
-labels.push(p);
 
-dieselTableHTML+=`<tr>
-<td>${p}</td>
-<td>${total.toFixed(1)}</td>
-</tr>`;
+dieselHTML+=`<tr><td>${p}</td><td>${total.toFixed(1)}</td></tr>`;
+
+labels.push(p);
+dieselVals.push(total);
+evVals.push(0); // EV tailpipe = 0
 }
 
-dieselTable.innerHTML=dieselTableHTML;
+dieselTable.innerHTML=dieselHTML;
 
 dieselSummary.innerHTML=`
 <b>Fuel:</b> ${fuel.toFixed(0)} L<br>
-<b>CO₂:</b> ${CO2_diesel.toFixed(0)} kg
+<b>CO₂:</b> ${CO2_d.toFixed(0)} kg
 `;
 
 // EV
 let energy_total=dist*ev_kwh;
-let CO2_ev=energy_total*grid;
+let CO2_e=energy_total*grid;
 
 evTable.innerHTML=`
 <tr><th>Parameter</th><th>Value</th></tr>
 <tr><td>Energy</td><td>${energy_total.toFixed(0)} kWh</td></tr>
-<tr><td>CO₂</td><td>${CO2_ev.toFixed(0)} kg</td></tr>
+<tr><td>CO₂</td><td>${CO2_e.toFixed(0)} kg</td></tr>
 `;
 
 evSummary.innerHTML=`
-<b>Grid Emission:</b> ${grid} kg/kWh
+<b>Grid Factor:</b> ${grid} kg/kWh
 `;
 
 // GRAPH
 if(chart) chart.destroy();
 
-chart=new Chart(chart, {
+chart=new Chart(document.getElementById("chart"),{
 type:'bar',
 data:{
 labels:['CO₂'],
 datasets:[
 {
 label:'Diesel CO₂',
-data:[CO2_diesel],
+data:[CO2_d],
 backgroundColor:'red'
 },
 {
 label:'EV CO₂',
-data:[CO2_ev],
+data:[CO2_e],
 backgroundColor:'green'
 }
 ]
 },
-options:{
-responsive:true,
-plugins:{legend:{display:true}},
-scales:{y:{beginAtZero:true}}
-}
+options:{responsive:true}
 });
 
 }
+
 </script>
 
 </body>
